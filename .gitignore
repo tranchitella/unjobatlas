@@ -37,6 +37,9 @@ db.sqlite3-journal
 # PostgreSQL data
 postgres_data/
 
+# Logs
+logs/
+
 # Environment variables
 .env
 
@@ -50,3 +53,6 @@ postgres_data/
 # OS
 .DS_Store
 Thumbs.db
+
+# Coverage
+.coverage
