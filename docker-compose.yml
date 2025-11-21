@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:18
+    container_name: unjobatlas_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: unjobatlas
+      POSTGRES_USER: unjobatlas
+      POSTGRES_PASSWORD: unjobatlas
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U unjobatlas -d unjobatlas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
