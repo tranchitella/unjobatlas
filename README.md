@@ -6,7 +6,7 @@ A Django application built with Django 4.2 LTS.
 
 ### Prerequisites
 - Python 3.11+
-- Docker and Docker Compose (for PostgreSQL)
+- Docker and Docker Compose (for PostgreSQL, Redis, and Elasticsearch)
 - Make (for running development tasks)
 
 ### Installation
@@ -31,43 +31,53 @@ cp .env.example .env
 # Edit .env with your configuration
 ```
 
-4. Start PostgreSQL and Redis with Docker:
+4. Start PostgreSQL, Redis, and Elasticsearch with Docker:
 ```bash
 docker compose up -d
 ```
 
-5. Run migrations:
+5. Create Elasticsearch index:
+```bash
+python manage.py search_index --create
+```
+
+6. Run migrations:
 ```bash
 python manage.py migrate
 ```
 
-6. Create a superuser:  
+7. Create a superuser:
 ```bash
 python manage.py createsuperuser
 ```
 
-7. Run the development server:
+8. Run the development server:
 ```bash
 python manage.py runserver
 ```
 
 Visit http://127.0.0.1:8000/ to see your application.
 
-## Database
+## Services
 
-The project uses PostgreSQL 18 and Redis running in Docker. 
+The project uses PostgreSQL, Redis, and Elasticsearch running in Docker. 
 
-- PostgreSQL data is stored in `postgres_data/` directory (gitignored)
-- Redis is used as the Celery message broker and result backend
+- **PostgreSQL 18**: Main database for storing job data
+  - Data stored in `postgres_data/` directory (gitignored)
+- **Redis 8**: Celery message broker and result backend
+- **Elasticsearch 8.19**: Search engine for job advertisements
+  - Data stored in `elasticsearch_data/` directory (gitignored)
+  - Provides full-text search, filtering, and aggregations
 
 ### Docker Commands
 
 - Start services: `docker compose up -d`
 - Stop services: `docker compose down`
-- View logs: `docker compose logs -f db` or `docker compose logs -f redis`
+- View logs: `docker compose logs -f [db|redis|elasticsearch]`
 - Reset database: `docker compose down -v` (warning: deletes all data)
+- Check service health: `docker compose ps`
 
-### Database Connection
+### Service Connection Details
 
 Default connection settings (defined in `.env.example`):
 - **PostgreSQL:**
@@ -79,25 +89,104 @@ Default connection settings (defined in `.env.example`):
 - **Redis:**
   - Host: localhost
   - Port: 6379
+- **Elasticsearch:**
+  - Host: http://localhost:9200
+  - Ports: 9200 (HTTP), 9300 (Transport)
 
 ## Project Structure
 
 - `config/` - Project settings and Celery configuration
-- `core/` - Main application with models, tasks, and signals
+- `core/` - Main application with models, tasks, signals, and Elasticsearch documents
 - `manage.py` - Django management script
-- `docker-compose.yml` - PostgreSQL and Redis configuration
+- `docker-compose.yml` - PostgreSQL, Redis, and Elasticsearch configuration
 - `scripts/` - Helper scripts for running Celery worker and crawler
+- `docs/` - Documentation for Celery, LLM extraction, and Elasticsearch
 
-## Web Crawler
+## Elasticsearch Search
 
-The project includes a management command to crawl UNjobs.org and populate the database with job postings. The crawler uses **asynchronous task processing** with Celery to download and parse job details.
+The project uses Elasticsearch for powerful search capabilities across job advertisements. All `JobAdvertisement` records are automatically indexed in real-time.
 
-### How It Works
+### Features
 
-1. **Index Crawling**: The `crawl_unjobs` command scrapes the job listing pages and creates `RawJobData` entries with minimal information (post_number, source_url)
-2. **Async Processing**: When a new `RawJobData` entry is created with `PENDING` status, a Django signal automatically triggers a Celery task
-3. **Job Details**: The Celery task downloads the full job posting page, parses the content, and updates the `RawJobData` entry with complete information
-4. **Retry Logic**: If downloading fails, the task automatically retries up to 5 times with 1-minute intervals
+- **Full-text search**: Search job titles, descriptions, and requirements
+- **Filtering**: Filter by organization, location, contract type, position level
+- **Aggregations**: Get faceted results (e.g., jobs by country, organization)
+- **Autocomplete**: Suggestions for organization names, locations
+- **Date range queries**: Find active jobs, jobs posted within date ranges
+- **Nested queries**: Search language requirements
+- **Real-time indexing**: Jobs are indexed automatically when created/updated
+
+### Quick Start
+
+```bash
+# Verify Elasticsearch is running
+curl http://localhost:9200
+
+# Create the index
+python manage.py search_index --create
+
+# Index existing jobs
+python manage.py rebuild_index
+
+# Check indexed documents
+curl http://localhost:9200/job_advertisements/_count?pretty
+```
+
+### Search Examples
+
+```python
+from core.documents import JobAdvertisementDocument
+
+# Search by job title
+search = JobAdvertisementDocument.search()
+results = search.query("match", post_name="Programme Officer")
+
+# Filter by country
+search = JobAdvertisementDocument.search()
+results = search.filter("term", location_country__keyword="Kenya")
+
+# Active jobs only
+from datetime import date
+search = JobAdvertisementDocument.search()
+results = search.filter("range", application_deadline={"gte": date.today()})
+
+# Execute and iterate
+for hit in results:
+    print(f"{hit.post_number}: {hit.post_name}")
+```
+
+For detailed documentation, see:
+- [Elasticsearch Setup Guide](docs/ELASTICSEARCH_SETUP.md)
+- [Elasticsearch Quick Start](docs/ELASTICSEARCH_QUICKSTART.md)
+
+## Web Crawler & Job Processing
+
+The project includes a comprehensive pipeline for crawling job postings from UNjobs.org and extracting structured information using AI:
+
+### Processing Pipeline
+
+1. **Index Crawling**: Scrapes job listing pages and creates `RawJobData` entries
+2. **Content Download**: Celery task downloads full job posting HTML and converts to Markdown
+3. **LLM Extraction**: OpenAI GPT-4 extracts structured job information from content
+4. **Job Creation**: Creates `JobAdvertisement` records with all fields populated
+5. **Elasticsearch Indexing**: Jobs are automatically indexed for search
+
+### Status Flow
+
+```
+PENDING → DOWNLOADING → DOWNLOADED → PROCESSING → PROCESSED
+                                                 ↘ FAILED
+```
+
+### Prerequisites
+
+1. **Celery Worker**: Must be running to process jobs
+2. **OpenAI API Key**: Required for LLM extraction (add to `.env`)
+
+```bash
+# In .env file
+OPENAI_API_KEY=sk-your-api-key-here
+```
 
 ### Starting the Celery Worker
 
@@ -132,15 +221,19 @@ The crawler will:
 
 - **Incremental crawling**: Remembers the last crawled job and only adds new postings
 - **Duplicate prevention**: Checks for existing posts before adding
-- **Async processing**: Job details are downloaded asynchronously by Celery workers
-- **Automatic retries**: Failed downloads retry up to 5 times with 1-minute delays
+- **Two-stage processing**: Separate download and extraction tasks
+- **AI-powered extraction**: Uses OpenAI GPT-4 to extract structured job data
+- **Automatic retries**: Failed tasks retry with exponential backoff
 - **Error handling**: Logs errors and tracks processing attempts
+- **Real-time indexing**: Jobs automatically appear in Elasticsearch
 - **State tracking**: Maintains crawler state and processing status in the database
-- **Status monitoring**: View processing status in Django admin:
+- **Status monitoring**: View processing status in Django admin at `/admin/core/rawjobdata/`
   - `PENDING`: Waiting to be processed
-  - `PROCESSING`: Currently being downloaded
-  - `PROCESSED`: Successfully downloaded and parsed
-  - `FAILED`: Failed after 5 retry attempts
+  - `DOWNLOADING`: Downloading job content
+  - `DOWNLOADED`: Content downloaded, ready for extraction
+  - `PROCESSING`: Extracting data with LLM
+  - `PROCESSED`: Successfully processed and JobAdvertisement created
+  - `FAILED`: Failed after maximum retry attempts
   - `SKIPPED`: Duplicate or invalid data
 
 ### Scheduling with Cron
@@ -164,6 +257,10 @@ chmod +x scripts/run_crawler.sh
 ```
 
 **Important**: Ensure the Celery worker is running as a background service (via supervisord, systemd, or similar) so it can process the jobs created by the cron job.
+
+For detailed documentation, see:
+- [Celery Setup Guide](docs/CELERY_SETUP.md)
+- [LLM Extraction Documentation](docs/LLM_EXTRACTION_SETUP.md)
 
 ## Development
 
