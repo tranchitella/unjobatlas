@@ -326,18 +326,40 @@ class RawJobDataAdmin(admin.ModelAdmin):
 
     date_hierarchy = "crawled_at"
 
-    actions = ["mark_as_pending", "mark_as_processed"]
+    actions = ["mark_as_pending", "mark_as_downloaded", "mark_as_processed"]
 
     def mark_as_pending(self, request, queryset):
         """Mark selected items as pending for reprocessing."""
-        updated = queryset.update(status="pending")
-        self.message_user(request, f"{updated} items marked as pending.")
+        count = 0
+        for item in queryset:
+            item.status = RawJobData.Statuses.PENDING
+            item.save()  # This triggers the signal that launches process_raw_job_data
+            count += 1
+        self.message_user(
+            request, f"{count} items marked as pending. Processing tasks queued."
+        )
 
     mark_as_pending.short_description = "Mark as pending for processing"
 
+    def mark_as_downloaded(self, request, queryset):
+        """Mark selected items as downloaded and trigger data extraction."""
+        count = 0
+        for item in queryset:
+            item.status = RawJobData.Statuses.DOWNLOADED
+            item.save()  # This triggers the signal that launches extract_job_data
+            count += 1
+        self.message_user(
+            request,
+            f"{count} items marked as downloaded. Data extraction tasks queued.",
+        )
+
+    mark_as_downloaded.short_description = (
+        "Mark as downloaded and ready for data extraction"
+    )
+
     def mark_as_processed(self, request, queryset):
         """Mark selected items as processed."""
-        updated = queryset.update(status="processed")
+        updated = queryset.update(status=RawJobData.Statuses.PROCESSED)
         self.message_user(request, f"{updated} items marked as processed.")
 
     mark_as_processed.short_description = "Mark as processed"
