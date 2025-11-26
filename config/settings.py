@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Third-party apps
+    "django_elasticsearch_dsl",
     # Local apps
     "core",
 ]
@@ -155,3 +157,17 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes max per task
 
 # OpenAI Configuration
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
+
+
+# Elasticsearch Configuration
+ELASTICSEARCH_DSL = {
+    "default": {
+        "hosts": config("ELASTICSEARCH_DSL_HOSTS", default="http://localhost:9200")
+    },
+}
+ELASTICSEARCH_DSL_AUTOSYNC = config(
+    "ELASTICSEARCH_DSL_AUTOSYNC", default=True, cast=bool
+)
+ELASTICSEARCH_DSL_SIGNAL_PROCESSOR = (
+    "django_elasticsearch_dsl.signals.RealTimeSignalProcessor"
+)
