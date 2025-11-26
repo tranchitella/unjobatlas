@@ -51,7 +51,15 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-8. Run the development server:
+8. Build the frontend:
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+9. Run the development server:
 ```bash
 python manage.py runserver
 ```
@@ -97,10 +105,11 @@ Default connection settings (defined in `.env.example`):
 
 - `config/` - Project settings and Celery configuration
 - `core/` - Main application with models, tasks, signals, and Elasticsearch documents
+- `frontend/` - Next.js application (React, TypeScript, Tailwind CSS, shadcn/ui)
 - `manage.py` - Django management script
 - `docker-compose.yml` - PostgreSQL, Redis, and Elasticsearch configuration
 - `scripts/` - Helper scripts for running Celery worker and crawler
-- `docs/` - Documentation for Celery, LLM extraction, and Elasticsearch
+- `docs/` - Documentation for Celery, LLM extraction, Elasticsearch, and frontend
 
 ## Elasticsearch Search
 
@@ -261,6 +270,65 @@ chmod +x scripts/run_crawler.sh
 For detailed documentation, see:
 - [Celery Setup Guide](docs/CELERY_SETUP.md)
 - [LLM Extraction Documentation](docs/LLM_EXTRACTION_SETUP.md)
+
+## Frontend
+
+The application includes a **Next.js** single-page application with a three-column desktop interface:
+
+- **Left Column (280px)**: Search filters with faceted search (organization, location, contract type, languages, position level)
+- **Center Column (flex)**: Scrollable job list with card-based display
+- **Right Column (600px)**: Detailed view of selected job
+
+### Technology Stack
+
+- **Next.js 16**: React framework with App Router and static export
+- **TypeScript**: Type-safe development
+- **Tailwind CSS**: Utility-first styling
+- **shadcn/ui**: High-quality React component library
+
+### Architecture
+
+The frontend is built as a **static export** and served directly by Django:
+- No separate Node.js server needed
+- All assets compiled to `frontend/build/` directory
+- Django serves `index.html` and static files
+- Single integrated process for development and production
+
+### Quick Start
+
+```bash
+# Build frontend
+cd frontend && npm run build && cd ..
+
+# Start Django (serves frontend + API)
+python manage.py runserver
+
+# Visit http://127.0.0.1:8000/
+```
+
+### Development Workflow
+
+For rapid frontend development with hot reload:
+
+```bash
+# Terminal 1: Django API
+python manage.py runserver
+
+# Terminal 2: Next.js dev server
+cd frontend && npm run dev
+
+# Visit http://localhost:3000/
+```
+
+### Current State
+
+The frontend is fully functional with mock data and ready for API integration. Next steps:
+1. Create Django REST API endpoints (`/api/jobs/`, `/api/jobs/:id/`, `/api/facets/`)
+2. Replace mock data with API calls
+3. Implement search and filtering logic
+4. Add pagination
+
+For detailed documentation, see [Frontend Setup Guide](docs/FRONTEND_SETUP.md).
 
 ## Development
 
