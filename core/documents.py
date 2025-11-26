@@ -193,7 +193,7 @@ class JobAdvertisementDocument(Document):
 
     def prepare_days_until_deadline(self, instance):
         """Prepare days_until_deadline computed property.
-        
+
         Returns None if days_until_deadline is not set, so jobs with missing deadlines
         can be distinguished from those whose deadline is today (0).
         """
