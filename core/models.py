@@ -115,26 +115,26 @@ class JobAdvertisement(models.Model):
     )
 
     POSITION_LEVEL_CHOICES = [
-        ("consultancy", "Consultancy"),
-        ("g-2", "G-2"),
-        ("g-3", "G-3"),
-        ("g-4", "G-4"),
-        ("g-5", "G-5"),
-        ("g-6", "G-6"),
-        ("g-7", "G-7"),
-        ("internship", "Internship"),
-        ("no-1", "NO-1"),
-        ("no-2", "NO-2"),
-        ("no-3", "NO-3"),
-        ("no-4", "NO-4"),
-        ("p-1", "P-1"),
-        ("p-2", "P-2"),
-        ("p-3", "P-3"),
-        ("p-4", "P-4"),
-        ("p-5", "P-5"),
-        ("d-1", "D-1"),
-        ("d-2", "D-2"),
-        ("other", "Other"),
+        ("Consultancy", "Consultancy"),
+        ("G-2", "G-2"),
+        ("G-3", "G-3"),
+        ("G-4", "G-4"),
+        ("G-5", "G-5"),
+        ("G-6", "G-6"),
+        ("G-7", "G-7"),
+        ("Internship", "Internship"),
+        ("NO-1", "NO-1"),
+        ("NO-2", "NO-2"),
+        ("NO-3", "NO-3"),
+        ("NO-4", "NO-4"),
+        ("P-1", "P-1"),
+        ("P-2", "P-2"),
+        ("P-3", "P-3"),
+        ("P-4", "P-4"),
+        ("P-5", "P-5"),
+        ("D-1", "D-1"),
+        ("D-2", "D-2"),
+        ("Other", "Other"),
     ]
     position_level = models.CharField(
         max_length=50,
@@ -342,6 +342,8 @@ class RawJobData(models.Model):
     # Processing status
     class Statuses(models.TextChoices):
         PENDING = "Pending Processing"
+        DOWNLOADING = "Downloading Content"
+        DOWNLOADED = "Content Downloaded"
         PROCESSING = "Currently Processing"
         PROCESSED = "Successfully Processed"
         FAILED = "Processing Failed"

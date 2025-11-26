@@ -151,3 +151,7 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes max per task
+
+
+# OpenAI Configuration
+OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
